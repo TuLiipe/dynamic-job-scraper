@@ -16,6 +16,12 @@ This project is a Python-based web scraper that extracts job listings from a dyn
 - Headless browser automation
 - Automatic output folder creation
 
+## Advanced Features
+- Logging system for monitoring scraping process
+- Error handling for robust execution
+- Automatic output directory creation
+- Data validation and duplicate removal
+
 ## ▶️ How to Run
 
 ```bash

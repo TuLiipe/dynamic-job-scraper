@@ -1,46 +1,83 @@
+import os
 import time
-import json
+import logging
 import pandas as pd
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
-import os
+# ----------------------------
+# Setup logging
+# ----------------------------
+logging.basicConfig(
+    filename="scraper.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+# ----------------------------
+# Create output directory
+# ----------------------------
 os.makedirs("output", exist_ok=True)
-# Setup driver
+
+# ----------------------------
+# Setup Selenium driver
+# ----------------------------
 options = webdriver.ChromeOptions()
-options.add_argument("--headless")  # Run in background
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+options.add_argument("--headless")
+options.add_argument("--start-maximized")
 
-url = "https://realpython.github.io/fake-jobs/"
-driver.get(url)
-time.sleep(3)
+driver = webdriver.Chrome(
+    service=Service(ChromeDriverManager().install()),
+    options=options
+)
 
-soup = BeautifulSoup(driver.page_source, "html.parser")
-driver.quit()
+try:
+    url = "https://realpython.github.io/fake-jobs/"
+    logging.info("Opening website...")
+    driver.get(url)
+    time.sleep(3)
 
-jobs = []
+    soup = BeautifulSoup(driver.page_source, "html.parser")
 
-for job in soup.find_all("div", class_="card-content"):
-    title = job.find("h2", class_="title").text.strip()
-    company = job.find("h3", class_="company").text.strip()
-    location = job.find("p", class_="location").text.strip()
+    jobs = []
 
-    jobs.append({
-        "Title": title,
-        "Company": company,
-        "Location": location
-    })
+    job_cards = soup.find_all("div", class_="card-content")
 
-# Convert to DataFrame
-df = pd.DataFrame(jobs)
+    for job in job_cards:
+        try:
+            title = job.find("h2", class_="title").text.strip()
+            company = job.find("h3", class_="company").text.strip()
+            location = job.find("p", class_="location").text.strip()
 
-# Save CSV
-df.to_csv("output/jobs.csv", index=False)
+            # Data validation
+            if title and company and location:
+                jobs.append({
+                    "Title": title,
+                    "Company": company,
+                    "Location": location
+                })
 
-# Save JSON
-df.to_json("output/jobs.json", orient="records", indent=4)
+        except Exception as e:
+            logging.warning(f"Error parsing job: {e}")
 
-print("Scraping completed successfully!")
+    # Convert to DataFrame
+    df = pd.DataFrame(jobs)
+
+    # Remove duplicates
+    df.drop_duplicates(inplace=True)
+
+    # Save files
+    df.to_csv("output/jobs.csv", index=False)
+    df.to_json("output/jobs.json", orient="records", indent=4)
+
+    logging.info("Scraping completed successfully.")
+    print("Scraping completed successfully!")
+
+except Exception as e:
+    logging.error(f"Fatal error: {e}")
+    print("Something went wrong. Check scraper.log")
+
+finally:
+    driver.quit()
